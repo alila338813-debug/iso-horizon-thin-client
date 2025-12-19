@@ -14,6 +14,11 @@ jobs:
         run: |
           rm -rf binary/ chroot/ cache/ config/binary config/bootstrap || true
 
+      - name: Debug config
+        run: |
+          lb config --bootloader grub --syslinux-theme none --gfxboot false
+          grep -E "LB_BOOTLOADER|LB_SYSLINUX_THEME|LB_GFXBOOT" config/binary
+
       - name: Install live-build
         run: |
           sudo apt update
