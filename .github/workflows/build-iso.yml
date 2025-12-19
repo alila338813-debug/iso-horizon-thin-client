@@ -25,7 +25,7 @@ jobs:
       - name: Verify Horizon .deb
         run: |
           ls -lh config/packages.chroot/
-          [ -f config/packages.chroot/vmware-horizon-client_*.deb ] || { echo "❌ Missing .deb"; exit 1; }
+          [ -f config/packages.chroot/VMware-Horizon-Client-*.deb ] || { echo "❌ Missing .deb"; exit 1; }
 
       # ✅ 关键3：配置（现在 lb 已存在！）
       - name: Configure live-build (GRUB only)
