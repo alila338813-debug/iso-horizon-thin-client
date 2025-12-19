@@ -1,4 +1,4 @@
-name: 🖥️ Build Horizon Thin Client ISO
+name: 🖥 Build Horizon Thin Client ISO
 on:
   workflow_dispatch:
   push:
@@ -13,7 +13,7 @@ jobs:
         with:
           lfs: true
 
-      - name: 🛠️ Install live-build and tools
+      - name: 🛠 Install live-build and tools
         run: |
           sudo apt update
           sudo apt install -y live-build xorriso
@@ -32,12 +32,24 @@ jobs:
             exit 1
           fi
 
+      # ✅ 新增：Configure live-build (关键！)
+      - name: ⚙ Configure live-build
+        run: |
+          lb config \
+            --distribution jammy \
+            --architectures amd64 \
+            --bootloader grub \
+            --syslinux-themes none \
+            --archive-areas main,restricted,universe,multiverse \
+            --bootappend-live "boot=live quiet splash nomodeset video=1024x768"
+
+      # ✅ 移动 Debug 到 config 之后
       - name: 🧪 Debug config
         run: |
           echo "=== config/binary ==="
           cat config/binary
 
-      - name: 🏗️ Build ISO
+      - name: 🏗 Build ISO
         run: |
           echo "🚀 Starting build..."
           time sudo lb build
@@ -53,4 +65,4 @@ jobs:
         if: always()
         run: |
           echo "✅ Done at $(date)"
-          ls -lh live-image-amd64.hybrid.iso 2>/dev/null || echo "⚠️ ISO not found"
+          ls -lh live-image-amd64.hybrid.iso 2>/dev/null || echo "⚠ ISO not found"
