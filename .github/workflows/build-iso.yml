@@ -1,6 +1,6 @@
 name: 🖥️ Build Horizon Thin Client ISO
 on:
-  workflow_dispatch:  # 手动触发
+  workflow_dispatch:
   push:
     branches: [ master ]
 
@@ -26,15 +26,14 @@ jobs:
       - name: 📦 Check Horizon .deb present
         run: |
           ls -lh config/packages.chroot/
-          if [ ! -f config/packages.chroot/VMware-Horizon-Client-*.deb ]; then
+          if [ ! -f config/packages.chroot/vmware-horizon-client_*.deb ]; then
             echo "❌ ERROR: Horizon .deb missing in config/packages.chroot/"
             echo "💡 Hint: Use Git LFS and ensure 'lfs: true' in checkout"
             exit 1
           fi
 
-      - name: ⚙️ Configure live-build (GRUB only, Ubuntu 22.04 compatible)
+      - name: ⚙️ Configure live-build (GRUB only)
         run: |
-          # Primary method: lb config with correct params
           lb config \
             --distribution jammy \
             --architectures amd64 \
@@ -43,34 +42,32 @@ jobs:
             --archive-areas "main restricted universe multiverse" \
             --bootappend-live "boot=live quiet splash nomodeset video=1024x768"
           
-          # Fallback: manually enforce config (double insurance)
+          # Fallback: enforce config manually
           mkdir -p config
           cat > config/binary <<'EOF'
 LB_BOOTLOADER="grub"
 LB_SYSLINUX_THEMES="none"
 EOF
 
-      - name: 🧪 Debug: Verify config applied
+      - name: 🧪 Debug config
         run: |
-          echo "=== config/binary content ==="
+          echo "=== config/binary ==="
           cat config/binary
-          echo "=== End ==="
 
       - name: 🏗️ Build ISO
         run: |
-          echo "🚀 Starting build (takes ~20 mins)..."
+          echo "🚀 Starting build..."
           time sudo lb build
 
-      - name: 📤 Upload ISO Artifact
+      - name: 📤 Upload ISO
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: horizon-thin-client.iso
           path: live-image-amd64.hybrid.iso
-          retention-days: 7
 
-      - name: 📊 Build Summary
+      - name: 📊 Summary
         if: always()
         run: |
-          echo "✅ Build completed at $(date)"
+          echo "✅ Done at $(date)"
           ls -lh live-image-amd64.hybrid.iso 2>/dev/null || echo "⚠️ ISO not found"
