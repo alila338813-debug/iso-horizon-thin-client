@@ -10,6 +10,10 @@ jobs:
         with:
           lfs: true
 
+      - name: Clean build artifacts
+        run: |
+          rm -rf binary/ chroot/ cache/ config/binary config/bootstrap || true
+
       - name: Install live-build
         run: |
           sudo apt update
