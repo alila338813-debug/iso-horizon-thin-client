@@ -2,7 +2,7 @@ name: 🖥️ Build Horizon Thin Client ISO
 on:
   workflow_dispatch:  # 手动触发
   push:
-    branches: [ main ]
+    branches: [ master ]
 
 jobs:
   build:
