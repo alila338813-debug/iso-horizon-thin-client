@@ -26,7 +26,7 @@ jobs:
       - name: 📦 Check Horizon .deb present
         run: |
           ls -lh config/packages.chroot/
-          if [ ! -f config/packages.chroot/vmware-horizon-client_*.deb ]; then
+          if [ ! -f config/packages.chroot/VMware-Horizon-Client-*.deb ]; then
             echo "❌ ERROR: Horizon .deb missing in config/packages.chroot/"
             echo "💡 Hint: Use Git LFS and ensure 'lfs: true' in checkout"
             exit 1
