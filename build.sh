@@ -8,8 +8,8 @@ lb config \
   --linux-flavours generic \
   --archive-areas "main restricted universe multiverse" \
   --bootloader grub \
-  --syslinux-theme none \          # ← 关键1：禁用 syslinux 主题
-  --gfxboot false \                # ← 关键2：禁用 gfxboot
+  --syslinux-theme none \
+  --gfxboot false \
   --bootappend-live "boot=live quiet splash nomodeset"
 
 echo "[+] Building ISO (this takes 15-25 mins)..."
