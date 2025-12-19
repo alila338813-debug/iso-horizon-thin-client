@@ -32,16 +32,20 @@ jobs:
             exit 1
           fi
 
-      # ✅ 新增：Configure live-build (关键！)
-      - name: ⚙ Configure live-build
+      - name: ⚙️ Manual config (Ubuntu 22.04 safe)
         run: |
-          lb config \
-            --distribution jammy \
-            --architectures amd64 \
-            --bootloader grub \
-            --syslinux-themes none \
-            --archive-areas main,restricted,universe,multiverse \
-            --bootappend-live "boot=live quiet splash nomodeset video=1024x768"
+          mkdir -p config
+          cat > config/binary <<'EOF'
+LB_BOOTLOADER="grub"
+LB_SYSLINUX="false"
+LB_ARCHITECTURES="amd64"
+LB_DISTRIBUTION="jammy"
+LB_ARCHIVE_AREAS="main restricted universe multiverse"
+LB_BOOTAPPEND_LIVE="boot=live quiet splash nomodeset video=1024x768"
+EOF
+
+      - name: 🧪 Verify config
+        run: cat config/binary
 
       # ✅ 移动 Debug 到 config 之后
       - name: 🧪 Debug config
