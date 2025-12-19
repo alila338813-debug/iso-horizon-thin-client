@@ -1,0 +1,38 @@
+# .github/workflows/build-iso.yml
+name: Build Horizon Thin Client ISO
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install live-build
+        run: |
+          sudo apt update
+          sudo apt install -y live-build xorriso
+
+      - name: Verify Horizon .deb exists
+        run: |
+          if [ ! -f config/packages.chroot/VMware-Horizon-Client-*.deb ]; then
+            echo "⚠️ Please upload Horizon .deb to config/packages.chroot/"
+            exit 1
+          fi
+
+      - name: Build ISO
+        run: |
+          lb config \
+            --distribution jammy \
+            --architectures amd64 \
+            --linux-flavours generic \
+            --archive-areas "main restricted universe multiverse"
+          sudo lb build
+
+      - name: Upload ISO Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: horizon-thin-client.iso
+          path: live-image-amd64.hybrid.iso

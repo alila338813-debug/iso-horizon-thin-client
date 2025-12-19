@@ -1,0 +1,15 @@
+[Unit]
+Description=Weston Compositor (user %i)
+BindsTo=graphical-session.target
+
+[Service]
+Type=dbus
+BusName=org.freedesktop.weston
+ExecStart=/usr/bin/weston --fullscreen --idle-time=0 --config=/home/%i/.config/weston.ini
+User=%i
+Restart=on-failure
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+Environment=WAYLAND_DISPLAY=wayland-0
+
+[Install]
+WantedBy=graphical-session.target

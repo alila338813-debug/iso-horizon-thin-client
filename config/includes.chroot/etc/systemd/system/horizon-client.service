@@ -1,0 +1,24 @@
+[Unit]
+Description=VMware Horizon Client
+After=weston@horizon.service
+Requires=weston@horizon.service
+
+[Service]
+Type=simple
+User=horizon
+Environment=DISPLAY=:1
+Environment=PULSE_SERVER=unix:/run/user/1000/pulse/native
+ExecStart=/usr/bin/vmware-view \
+  --serverURL=172.16.1.213 \
+  --domain=EXAMPLE \
+  --user=thinuser \
+  --fullscreen \
+  --useDirectX=false \
+  --enableBlastCodec=true \
+  --enablePCoIP=true \
+  --enableClipboard=true \
+  --enableClientDriveRedirection=true \
+  --logLevel=error
+
+[Install]
+WantedBy=default.target
