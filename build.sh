@@ -5,11 +5,9 @@ echo "[+] Initializing live-build config..."
 lb config \
   --distribution jammy \
   --architectures amd64 \
-  --linux-flavours generic \
-  --archive-areas "main restricted universe multiverse" \
   --bootloader grub \
-  --syslinux-theme none \
-  --gfxboot false \
+  --syslinux-themes none \
+  --archive-areas "main restricted universe multiverse" \
   --bootappend-live "boot=live quiet splash nomodeset"
 
 echo "[+] Building ISO (this takes 15-25 mins)..."

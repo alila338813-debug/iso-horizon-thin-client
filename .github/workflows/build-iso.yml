@@ -32,23 +32,6 @@ jobs:
             exit 1
           fi
 
-      - name: ⚙️ Configure live-build (GRUB only)
-        run: |
-          lb config \
-            --distribution jammy \
-            --architectures amd64 \
-            --bootloader grub \
-            --syslinux-themes none \
-            --archive-areas "main restricted universe multiverse" \
-            --bootappend-live "boot=live quiet splash nomodeset video=1024x768"
-          
-          # Fallback: enforce config manually
-          mkdir -p config
-          cat > config/binary <<'EOF'
-LB_BOOTLOADER="grub"
-LB_SYSLINUX_THEMES="none"
-EOF
-
       - name: 🧪 Debug config
         run: |
           echo "=== config/binary ==="
