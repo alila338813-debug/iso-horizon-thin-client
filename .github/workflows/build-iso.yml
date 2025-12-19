@@ -32,17 +32,18 @@ jobs:
             exit 1
           fi
 
-      - name: ⚙️ Manual config (Ubuntu 22.04 safe)
+      - name: ⚙️ Manual config (safe for GitHub Actions)
         run: |
           mkdir -p config
-          cat > config/binary <<'EOF'
-LB_BOOTLOADER="grub"
-LB_SYSLINUX="false"
-LB_ARCHITECTURES="amd64"
-LB_DISTRIBUTION="jammy"
-LB_ARCHIVE_AREAS="main restricted universe multiverse"
-LB_BOOTAPPEND_LIVE="boot=live quiet splash nomodeset video=1024x768"
-EOF
+          printf '%s\n' \
+            'LB_BOOTLOADER="grub"' \
+            'LB_SYSLINUX="false"' \
+            'LB_ARCHITECTURES="amd64"' \
+            'LB_DISTRIBUTION="jammy"' \
+            'LB_ARCHIVE_AREAS="main restricted universe multiverse"' \
+            'LB_BOOTAPPEND_LIVE="boot=live quiet splash nomodeset video=1024x768"' \
+            > config/binary
+          echo "✅ config/binary created"
 
       - name: 🧪 Verify config
         run: cat config/binary
