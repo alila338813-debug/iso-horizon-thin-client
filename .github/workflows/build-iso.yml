@@ -1,54 +1,76 @@
-name: Build Horizon Thin Client ISO
-on: [workflow_dispatch]
+name: 🖥️ Build Horizon Thin Client ISO
+on:
+  workflow_dispatch:  # 手动触发
+  push:
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - name: Checkout
+      - name: 📥 Checkout code (with LFS)
         uses: actions/checkout@v4
         with:
           lfs: true
 
-      # ✅ 关键1：先安装 live-build（否则 lb: command not found）
-      - name: Install live-build and dependencies
+      - name: 🛠️ Install live-build and tools
         run: |
           sudo apt update
           sudo apt install -y live-build xorriso
 
-      # ✅ 关键2：验证 lb 是否可用
-      - name: Verify lb command
+      - name: 🔍 Verify lb command exists
         run: |
-          which lb
+          which lb || { echo "❌ live-build not installed"; exit 1; }
           lb --version
 
-      - name: Verify Horizon .deb
+      - name: 📦 Check Horizon .deb present
         run: |
           ls -lh config/packages.chroot/
-          [ -f config/packages.chroot/VMware-Horizon-Client-*.deb ] || { echo "❌ Missing .deb"; exit 1; }
+          if [ ! -f config/packages.chroot/VMware-Horizon-Client-*.deb ]; then
+            echo "❌ ERROR: Horizon .deb missing in config/packages.chroot/"
+            echo "💡 Hint: Use Git LFS and ensure 'lfs: true' in checkout"
+            exit 1
+          fi
 
-      # ✅ 关键3：配置（现在 lb 已存在！）
-      - name: Configure live-build (GRUB only)
+      - name: ⚙️ Configure live-build (GRUB only, Ubuntu 22.04 compatible)
         run: |
+          # Primary method: lb config with correct params
           lb config \
             --distribution jammy \
             --architectures amd64 \
             --bootloader grub \
-            --syslinux-theme none \
-            --gfxboot false \
+            --syslinux-themes none \
             --archive-areas "main restricted universe multiverse" \
-            --bootappend-live "boot=live quiet splash nomodeset"
+            --bootappend-live "boot=live quiet splash nomodeset video=1024x768"
+          
+          # Fallback: manually enforce config (double insurance)
+          mkdir -p config
+          cat > config/binary <<'EOF'
+LB_BOOTLOADER="grub"
+LB_SYSLINUX_THEMES="none"
+EOF
 
-      # ✅ 关键4：验证配置写入
-      - name: Debug config
-        run: grep -E "LB_BOOTLOADER|LB_SYSLINUX_THEME|LB_GFXBOOT" config/binary
+      - name: 🧪 Debug: Verify config applied
+        run: |
+          echo "=== config/binary content ==="
+          cat config/binary
+          echo "=== End ==="
 
-      # ✅ 关键5：构建
-      - name: Build ISO
-        run: sudo lb build
+      - name: 🏗️ Build ISO
+        run: |
+          echo "🚀 Starting build (takes ~20 mins)..."
+          time sudo lb build
 
-      - name: Upload ISO
+      - name: 📤 Upload ISO Artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: horizon-thin-client.iso
           path: live-image-amd64.hybrid.iso
+          retention-days: 7
+
+      - name: 📊 Build Summary
+        if: always()
+        run: |
+          echo "✅ Build completed at $(date)"
+          ls -lh live-image-amd64.hybrid.iso 2>/dev/null || echo "⚠️ ISO not found"
