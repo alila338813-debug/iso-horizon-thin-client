@@ -52,7 +52,7 @@ jobs:
           lb config \
             --distribution jammy \
             --architectures amd64 \
-            --bootloader grub \
+            --bootloader grub-pc \
             --archive-areas "main restricted universe multiverse" \
             --bootappend-live "boot=live quiet splash nomodeset" \
             --mirror-bootstrap "https://archive.ubuntu.com/ubuntu/" \
@@ -71,6 +71,18 @@ jobs:
           # 创建空包列表以覆盖默认设置
           echo "# Empty package list" > config/package-lists/empty.list.chroot
           echo "# Empty binary package list" > config/package-lists/empty.list.binary
+
+          # 确保 GRUB 包在包列表中（修复 grub-legacy 错误）
+          echo "=== Adding GRUB packages to horizon.list.chroot ==="
+          if [ -f "config/package-lists/horizon.list.chroot" ]; then
+            # 添加正确的 GRUB 包
+            echo "grub-pc" >> config/package-lists/horizon.list.chroot
+            echo "grub-common" >> config/package-lists/horizon.list.chroot
+            echo "grub2-common" >> config/package-lists/horizon.list.chroot
+            echo "Added GRUB packages to horizon.list.chroot"
+          else
+            echo "WARNING: horizon.list.chroot not found"
+          fi
 
           # 修复 chroot 内的 apt 源配置
           echo "=== Fixing apt sources in chroot ==="
@@ -91,6 +103,11 @@ jobs:
           echo 'LB_APT_INDICES="false"' >> config/binary
           echo 'LB_APT_RECOMMENDS="false"' >> config/binary
           echo 'LB_APT_OPTIONS="--allow-unauthenticated"' >> config/binary
+          # 指定 GRUB 包，避免使用 grub-legacy
+          echo 'LB_GRUB_PACKAGES="grub-pc"' >> config/binary
+          echo 'LB_GRUB="grub-pc"' >> config/binary
+          echo 'LB_GRUB_INSTALL="grub-install"' >> config/binary
+          echo 'LB_GRUB_MKCONFIG="grub-mkconfig"' >> config/binary
 
       - name: 🧪 Verify config before build
         run: |
