@@ -49,11 +49,11 @@ jobs:
           # 清理现有配置
           rm -rf config/auto config/package-lists/*.list.binary config/package-lists/*.list.chroot_auto 2>/dev/null || true
 
-          # 使用 Ubuntu 24.04 (noble) 配置
+          # 使用 Ubuntu 24.04 (noble) 配置 - 创建混合引导 ISO
           lb config \
             --distribution noble \
             --architectures amd64 \
-            --bootloader grub-efi \
+            --bootloader grub \
             --archive-areas "main restricted universe multiverse" \
             --bootappend-live "boot=live quiet splash nomodeset" \
             --mirror-bootstrap "https://archive.ubuntu.com/ubuntu/" \
@@ -61,7 +61,7 @@ jobs:
             --mirror-chroot-security "https://security.ubuntu.com/ubuntu/" \
             --security false \
             --binary-images iso-hybrid \
-            --grub-splash none
+            --debian-installer live
 
       - name: 🧪 Configure package lists
         run: |
@@ -109,28 +109,22 @@ jobs:
           echo 'LB_APT_INDICES="false"' >> config/binary
           echo 'LB_APT_RECOMMENDS="false"' >> config/binary
           echo 'LB_APT_OPTIONS="--allow-unauthenticated"' >> config/binary
-          # 指定 GRUB 包，避免使用 grub-legacy - 只使用 UEFI 包
-          echo 'LB_GRUB_PACKAGES="grub-efi-amd64 grub-efi-amd64-signed grub-common grub2-common"' >> config/binary
-          echo 'LB_GRUB="grub-efi-amd64"' >> config/binary
+          # 配置混合引导支持
+          echo 'LB_GRUB_PACKAGES="grub-pc grub-efi-amd64"' >> config/binary
           echo 'LB_GRUB_INSTALL="grub-install"' >> config/binary
           echo 'LB_GRUB_MKCONFIG="grub-mkconfig"' >> config/binary
-          # 明确禁用 grub-legacy 和 grub-pc
-          echo 'LB_GRUB_LEGACY="false"' >> config/binary
-          echo 'LB_GRUB_PC="false"' >> config/binary
-          # 启用 UEFI 支持
+          # 启用 UEFI 和 BIOS 支持
           echo 'LB_EFI="true"' >> config/binary
-          echo 'LB_EFI_BOOTLOADER="grub-efi-amd64"' >> config/binary
+          echo 'LB_BIOS="true"' >> config/binary
           # 启用 ISO hybrid 功能用于 USB 启动
           echo 'LB_ISO_HYBRID="true"' >> config/binary
           echo 'LB_BINARY_IMAGES="iso-hybrid"' >> config/binary
           echo 'LB_ISO_APPLICATION="Ubuntu Horizon Thin Client"' >> config/binary
           echo 'LB_ISO_PREPARER="live-build"' >> config/binary
           echo 'LB_ISO_PUBLISHER="Horizon TC Project"' >> config/binary
-          # 配置引导参数 - 使用 UEFI GRUB 作为主要引导加载器
-          echo 'LB_BOOTLOADER="grub-efi"' >> config/binary
+          # 配置引导参数
+          echo 'LB_BOOTLOADER="grub"' >> config/binary
           echo 'LB_SYSLINUX="false"' >> config/binary
-          # 确保使用正确的 GRUB 版本
-          echo 'LB_GRUB_VERSION="2"' >> config/binary
 
       - name: 🧪 Verify config before build
         run: |
@@ -164,6 +158,25 @@ jobs:
           if [ -f "config/package-lists/horizon.list.chroot" ]; then
             echo "Current horizon.list.chroot contents:"
             cat config/package-lists/horizon.list.chroot
+          fi
+          echo ""
+          echo "=== Final cleanup and verification ==="
+          # 清理自动生成的包列表
+          rm -f config/package-lists/*.list.chroot_auto config/package-lists/*.list.binary_auto 2>/dev/null || true
+          # 确保 horizon.list.chroot 包含正确的 GRUB 包
+          if [ -f "config/package-lists/horizon.list.chroot" ]; then
+            echo "Adding both BIOS and UEFI GRUB packages"
+            # 移除现有的 GRUB 包
+            grep -v "^grub-" config/package-lists/horizon.list.chroot > config/package-lists/horizon.list.chroot.tmp
+            mv config/package-lists/horizon.list.chroot.tmp config/package-lists/horizon.list.chroot
+            # 添加混合引导包
+            echo "grub-pc" >> config/package-lists/horizon.list.chroot
+            echo "grub-efi-amd64" >> config/package-lists/horizon.list.chroot
+            echo "grub-common" >> config/package-lists/horizon.list.chroot
+            echo "grub2-common" >> config/package-lists/horizon.list.chroot
+            echo "grub-efi-amd64-signed" >> config/package-lists/horizon.list.chroot
+            echo "shim-signed" >> config/package-lists/horizon.list.chroot
+            echo "efibootmgr" >> config/package-lists/horizon.list.chroot
           fi
           echo ""
           set -x
