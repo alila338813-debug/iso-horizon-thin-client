@@ -43,7 +43,7 @@ libxi6
 libxrandr2
 libxrender1
 libxtst6
-libssl3t64
+libssl3
 grub-pc
 grub-common
 grub2-common

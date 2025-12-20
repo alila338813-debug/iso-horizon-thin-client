@@ -53,7 +53,8 @@ jobs:
             --mirror-bootstrap "https://archive.ubuntu.com/ubuntu/" \
             --mirror-chroot "https://archive.ubuntu.com/ubuntu/" \
             --mirror-chroot-security "https://security.ubuntu.com/ubuntu/" \
-            --security false
+            --security false \
+            --binary-images iso-hybrid
 
       - name: 🧪 Configure package lists
         run: |
@@ -108,6 +109,13 @@ jobs:
           echo 'LB_GRUB_MKCONFIG="grub-mkconfig"' >> config/binary
           # 启用 ISO hybrid 功能用于 USB 启动
           echo 'LB_ISO_HYBRID="true"' >> config/binary
+          echo 'LB_BINARY_IMAGES="iso-hybrid"' >> config/binary
+          echo 'LB_ISO_APPLICATION="Ubuntu Horizon Thin Client"' >> config/binary
+          echo 'LB_ISO_PREPARER="live-build"' >> config/binary
+          echo 'LB_ISO_PUBLISHER="Horizon TC Project"' >> config/binary
+          # 配置引导参数 - 使用 GRUB 作为主要引导加载器
+          echo 'LB_BOOTLOADER="grub"' >> config/binary
+          echo 'LB_SYSLINUX="false"' >> config/binary
 
       - name: 🧪 Verify config before build
         run: |
@@ -128,12 +136,24 @@ jobs:
           cat config/archives/ubuntu.list.chroot || echo "No ubuntu.list.chroot found"
           echo ""
           echo "=== Starting lb build with debugging ==="
+          # 检查引导配置
+          echo "Checking boot configuration..."
+          ls -la config/boot* 2>/dev/null || echo "No boot config files found"
+          echo ""
           set -x
           time sudo lb build 2>&1 | tee build.log
           set +x
           echo ""
           echo "=== Build log summary ==="
-          tail -50 build.log | grep -E "(Error|error|FAIL|fail|auto|Release)" || echo "No significant errors found"
+          tail -100 build.log | grep -E "(Error|error|FAIL|fail|auto|Release|boot|isohybrid)" || echo "No significant errors found"
+          echo ""
+          echo "=== Checking ISO file ==="
+          ls -lh *.iso 2>/dev/null || echo "No ISO files found"
+          if [ -f "live-image-amd64.hybrid.iso" ]; then
+            echo "ISO file exists, checking boot info..."
+            file live-image-amd64.hybrid.iso
+            isoinfo -d -i live-image-amd64.hybrid.iso 2>/dev/null || echo "Cannot read ISO info"
+          fi
 
       - name: 📤 Upload ISO
         if: success()
