@@ -37,60 +37,47 @@ jobs:
           # Clean up any existing config to avoid conflicts
           rm -rf config/auto config/package-lists/*.list.binary config/package-lists/*.list.chroot_auto 2>/dev/null || true
 
-          # Debug: Check what's in config before lb config
-          echo "=== Config before lb config ==="
-          find config -type f 2>/dev/null | sort || true
-
           lb config \
             --distribution jammy \
             --architectures amd64 \
             --bootloader grub \
-            --syslinux-theme none \
-            --gfxboot false \
+            --syslinux-themes none \
             --archive-areas "main restricted universe multiverse" \
-            --bootappend-live "boot=live quiet splash nomodeset" \
-            --package-lists "horizon"
+            --bootappend-live "boot=live quiet splash nomodeset"
 
-      - name: 🧪 Debug config
+      - name: 🧪 Configure package lists
         run: |
-          echo "=== Checking config/binary ==="
-          cat config/binary || true
-          echo ""
-          echo "=== Checking package lists ==="
-          ls -la config/package-lists/ || true
-          echo ""
-          echo "=== Checking for auto package in lists ==="
-          grep -r "auto" config/package-lists/ || echo "No 'auto' found in package lists"
-          echo ""
-          echo "=== All package list files ==="
+          # 确保使用我们的包列表
+          echo 'LB_PACKAGE_LISTS="horizon"' >> config/binary
+
+          # 创建二进制包列表
+          echo "live-boot" > config/package-lists/horizon.list.binary
+
+          # 检查并移除任何包含 "auto" 的包列表
+          echo "=== Checking for 'auto' in package lists ==="
           find config/package-lists/ -type f -name "*.list.*" 2>/dev/null | while read file; do
-            echo "=== $file ==="
-            cat "$file"
-            echo ""
-          done || true
-          echo ""
-          echo "=== Checking for auto in all config files ==="
-          find config -type f -exec grep -l "auto" {} \; 2>/dev/null || echo "No files contain 'auto'"
-          echo ""
-          echo "=== Checking what 'auto' directory contains ==="
-          ls -la config/auto/ 2>/dev/null || echo "No config/auto directory"
+            if grep -q "^auto$" "$file" || grep -q "^auto " "$file"; then
+              echo "Removing 'auto' from $file"
+              grep -v "^auto$" "$file" | grep -v "^auto " > "${file}.fixed"
+              mv "${file}.fixed" "$file"
+            fi
+          done
+
+          # 创建空包列表以覆盖默认设置
+          echo "# Empty package list" > config/package-lists/empty.list.chroot
+          echo "# Empty binary package list" > config/package-lists/empty.list.binary
+          echo 'LB_PACKAGE_LISTS="horizon empty"' >> config/binary
 
       - name: 🏗 Build ISO
         run: |
           echo "🚀 Starting build..."
-          echo "=== Debug: Checking all package list files before build ==="
-          find config/package-lists/ -type f -name "*.list.*" -exec sh -c 'echo "=== {} ==="; cat {}' \; 2>/dev/null || true
+          echo "=== Final package lists ==="
+          find config/package-lists/ -type f -name "*.list.*" -exec sh -c 'echo "{}:"; cat {}; echo' \; 2>/dev/null || true
           echo ""
-          echo "=== Creating empty package list to override any defaults ==="
-          echo "# Empty package list" > config/package-lists/empty.list.chroot
-          echo "# Empty binary package list" > config/package-lists/empty.list.binary
+          echo "=== Final config/binary ==="
+          cat config/binary
           echo ""
-          echo "=== Checking if 'auto' is a directory or file ==="
-          find config -name "*auto*" -type f 2>/dev/null || echo "No files with 'auto' in name"
-          find config -name "*auto*" -type d 2>/dev/null || echo "No directories with 'auto' in name"
-          echo ""
-          echo "=== Starting lb build with verbose output ==="
-          time sudo lb build --verbose
+          time sudo lb build
 
       - name: 📤 Upload ISO
         if: success()
