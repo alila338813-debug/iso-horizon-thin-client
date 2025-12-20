@@ -13,25 +13,16 @@ jobs:
         with:
           lfs: true
 
-      - name: 🛠 Install and upgrade live-build
+      - name: 🛠 Install live-build and fix apt sources
         run: |
+          # 修复 apt 源以避免 Release 文件错误
+          echo "=== Fixing apt sources to avoid Release file errors ==="
+          sudo sed -i 's|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' /etc/apt/sources.list
+          sudo sed -i 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list
+
           sudo apt update
           sudo apt install -y live-build xorriso
-          # 尝试升级到最新版本
-          sudo apt upgrade -y live-build || true
-          # 检查版本和详细信息
-          echo "=== Live-build version info ==="
           lb --version
-          echo ""
-          echo "=== System information ==="
-          echo "Ubuntu version:"
-          lsb_release -a || cat /etc/os-release
-          echo ""
-          echo "=== Checking for auto package in repositories ==="
-          apt-cache search ^auto$ 2>/dev/null || echo "No exact 'auto' package found"
-          echo ""
-          echo "=== Checking live-build configuration ==="
-          find /usr/share/live-build -name "*auto*" -type f 2>/dev/null | head -10 || echo "No auto files in live-build"
 
       - name: 🔍 Verify lb command exists
         run: |
@@ -49,10 +40,10 @@ jobs:
 
       - name: ⚙️ Configure live-build
         run: |
-          # Clean up any existing config
+          # 清理现有配置
           rm -rf config/auto config/package-lists/*.list.binary config/package-lists/*.list.chroot_auto 2>/dev/null || true
 
-          # Use minimal lb config with all auto features disabled
+          # 使用最小配置
           lb config \
             --distribution jammy \
             --architectures amd64 \
@@ -68,29 +59,14 @@ jobs:
           # 创建二进制包列表
           echo "live-boot" > config/package-lists/horizon.list.binary
 
-          # 检查并修复任何包含 "auto" 的包列表
-          echo "=== Checking for 'auto' in package lists ==="
-          find config/package-lists/ -type f -name "*.list.*" 2>/dev/null | while read file; do
-            if grep -q "^auto$" "$file" || grep -q "^auto " "$file"; then
-              echo "Removing 'auto' from $file"
-              grep -v "^auto$" "$file" | grep -v "^auto " > "${file}.fixed"
-              mv "${file}.fixed" "$file"
-            fi
-          done
-
-          # 创建空包列表以覆盖任何默认设置
+          # 创建空包列表以覆盖默认设置
           echo "# Empty package list" > config/package-lists/empty.list.chroot
           echo "# Empty binary package list" > config/package-lists/empty.list.binary
 
-          # 设置包列表配置 - 禁用所有自动功能
+          # 设置包列表配置
           echo 'LB_PACKAGE_LISTS="horizon empty"' >> config/binary
           echo 'LB_APT_INDICES="false"' >> config/binary
           echo 'LB_APT_RECOMMENDS="false"' >> config/binary
-          echo 'LB_APT_AUTOREMOVE="false"' >> config/binary
-          echo 'LB_APT_AUTOCLEAN="false"' >> config/binary
-          echo 'LB_DEBIAN_INSTALLER="false"' >> config/binary
-          echo 'LB_DEBIAN_INSTALLER_TITLE=""' >> config/binary
-          echo 'LB_INITRAMFS="none"' >> config/binary
 
       - name: 🧪 Verify config before build
         run: |
@@ -100,64 +76,15 @@ jobs:
           echo ""
           echo "Package lists:"
           ls -la config/package-lists/
-          echo ""
-          echo "Checking for 'auto' in package lists:"
-          grep -r "auto" config/package-lists/ || echo "No 'auto' found"
-          echo ""
-          echo "Checking for auto-generated package lists:"
-          find config/package-lists/ -name "*auto*" -type f 2>/dev/null || echo "No auto-generated lists found"
-          echo ""
-          echo "All package list contents:"
-          find config/package-lists/ -type f -name "*.list.*" -exec sh -c 'echo "=== {} ==="; cat {}' \; 2>/dev/null || true
 
       - name: 🏗 Build ISO
         run: |
           echo "🚀 Starting build..."
-          echo "=== Final check before build ==="
-          echo "Removing any auto-generated package lists..."
-          rm -f config/package-lists/*.list.chroot_auto config/package-lists/*.list.binary_auto 2>/dev/null || true
+          echo "=== Final configuration ==="
+          cat config/binary
           echo ""
-          echo "=== Disabling all auto features ==="
-          # 禁用所有可能的自动功能
-          echo 'LB_AUTO="false"' >> config/binary
-          echo 'LB_MODE="debian"' >> config/binary
-          echo 'LB_PARENTS="false"' >> config/binary
-          echo 'LB_SOURCE="false"' >> config/binary
-          echo ""
-          echo "=== Checking if auto is a live-build bug ==="
-          # 检查是否是已知的 live-build bug
-          echo "Searching for auto in live-build scripts..."
-          grep -r "package.*auto" /usr/share/live-build /usr/lib/live-build 2>/dev/null | head -5 || echo "No auto package references found"
-          echo ""
-          echo "=== Creating mandatory auto package ==="
-          # 创建一个必须的 auto 虚拟包
-          mkdir -p config/packages.chroot/auto-pkg/DEBIAN
-          echo "Package: auto" > config/packages.chroot/auto-pkg/DEBIAN/control
-          echo "Version: 1.0-1" >> config/packages.chroot/auto-pkg/DEBIAN/control
-          echo "Architecture: all" >> config/packages.chroot/auto-pkg/DEBIAN/control
-          echo "Maintainer: Horizon TC <horizon@example.com>" >> config/packages.chroot/auto-pkg/DEBIAN/control
-          echo "Description: Mandatory auto package for live-build" >> config/packages.chroot/auto-pkg/DEBIAN/control
-          echo "Priority: required" >> config/packages.chroot/auto-pkg/DEBIAN/control
-          echo "Essential: yes" >> config/packages.chroot/auto-pkg/DEBIAN/control
-          dpkg-deb --build config/packages.chroot/auto-pkg config/packages.chroot/auto_1.0-1_all.deb
-          echo ""
-          echo "=== Adding auto to package list ==="
-          echo "auto" >> config/package-lists/horizon.list.chroot
-          echo ""
-          echo "=== Final system check ==="
-          echo "Checking Ubuntu repository configuration..."
-          grep -r "jammy" /etc/apt/sources.list* 2>/dev/null | head -3 || echo "No jammy sources found"
-          echo ""
-          echo "=== Starting lb build with more debugging ==="
-          # 启用详细输出以查看具体错误
-          set -x
-          time sudo lb build --verbose 2>&1 | tee build.log
-          set +x
-          echo ""
-          echo "=== Checking build log for errors ==="
-          grep -n -B3 -A3 "auto" build.log || echo "No auto references in build log"
-          echo ""
-          echo "If build failed with auto error, this is likely a live-build bug."
+          echo "=== Starting lb build ==="
+          time sudo lb build
 
       - name: 📤 Upload ISO
         if: success()
