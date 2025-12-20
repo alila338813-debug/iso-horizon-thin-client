@@ -2,7 +2,7 @@ name: 🖥 Build Horizon Thin Client ISO
 on:
   workflow_dispatch:
   push:
-    branches: [ master ]
+    branches: [master]
 
 jobs:
   build:
@@ -32,32 +32,65 @@ jobs:
             exit 1
           fi
 
-      - name: ⚙️ Manual config (safe for GitHub Actions)
+      - name: ⚙️ Configure live-build (GRUB only)
         run: |
-          mkdir -p config
-          printf '%s\n' \
-            'LB_BOOTLOADER="grub"' \
-            'LB_SYSLINUX="false"' \
-            'LB_ARCHITECTURES="amd64"' \
-            'LB_DISTRIBUTION="jammy"' \
-            'LB_ARCHIVE_AREAS="main restricted universe multiverse"' \
-            'LB_BOOTAPPEND_LIVE="boot=live quiet splash nomodeset video=1024x768"' \
-            > config/binary
-          echo "✅ config/binary created"
+          # Clean up any existing config to avoid conflicts
+          rm -rf config/auto config/package-lists/*.list.binary config/package-lists/*.list.chroot_auto 2>/dev/null || true
 
-      - name: 🧪 Verify config
-        run: cat config/binary
+          # Debug: Check what's in config before lb config
+          echo "=== Config before lb config ==="
+          find config -type f 2>/dev/null | sort || true
 
-      # ✅ 移动 Debug 到 config 之后
+          lb config \
+            --distribution jammy \
+            --architectures amd64 \
+            --bootloader grub \
+            --syslinux-theme none \
+            --gfxboot false \
+            --archive-areas "main restricted universe multiverse" \
+            --bootappend-live "boot=live quiet splash nomodeset" \
+            --package-lists "horizon"
+
       - name: 🧪 Debug config
         run: |
-          echo "=== config/binary ==="
-          cat config/binary
+          echo "=== Checking config/binary ==="
+          cat config/binary || true
+          echo ""
+          echo "=== Checking package lists ==="
+          ls -la config/package-lists/ || true
+          echo ""
+          echo "=== Checking for auto package in lists ==="
+          grep -r "auto" config/package-lists/ || echo "No 'auto' found in package lists"
+          echo ""
+          echo "=== All package list files ==="
+          find config/package-lists/ -type f -name "*.list.*" 2>/dev/null | while read file; do
+            echo "=== $file ==="
+            cat "$file"
+            echo ""
+          done || true
+          echo ""
+          echo "=== Checking for auto in all config files ==="
+          find config -type f -exec grep -l "auto" {} \; 2>/dev/null || echo "No files contain 'auto'"
+          echo ""
+          echo "=== Checking what 'auto' directory contains ==="
+          ls -la config/auto/ 2>/dev/null || echo "No config/auto directory"
 
       - name: 🏗 Build ISO
         run: |
           echo "🚀 Starting build..."
-          time sudo lb build
+          echo "=== Debug: Checking all package list files before build ==="
+          find config/package-lists/ -type f -name "*.list.*" -exec sh -c 'echo "=== {} ==="; cat {}' \; 2>/dev/null || true
+          echo ""
+          echo "=== Creating empty package list to override any defaults ==="
+          echo "# Empty package list" > config/package-lists/empty.list.chroot
+          echo "# Empty binary package list" > config/package-lists/empty.list.binary
+          echo ""
+          echo "=== Checking if 'auto' is a directory or file ==="
+          find config -name "*auto*" -type f 2>/dev/null || echo "No files with 'auto' in name"
+          find config -name "*auto*" -type d 2>/dev/null || echo "No directories with 'auto' in name"
+          echo ""
+          echo "=== Starting lb build with verbose output ==="
+          time sudo lb build --verbose
 
       - name: 📤 Upload ISO
         if: success()
