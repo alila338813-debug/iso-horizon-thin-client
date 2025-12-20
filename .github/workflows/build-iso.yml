@@ -32,28 +32,33 @@ jobs:
             exit 1
           fi
 
-      - name: ⚙️ Configure live-build (GRUB only)
+      - name: ⚙️ Manual config (safe for GitHub Actions)
         run: |
-          # Clean up any existing config to avoid conflicts
-          rm -rf config/auto config/package-lists/*.list.binary config/package-lists/*.list.chroot_auto 2>/dev/null || true
+          mkdir -p config
+          # Create binary config
+          printf '%s\n' \
+            'LB_BOOTLOADER="grub"' \
+            'LB_SYSLINUX="false"' \
+            'LB_ARCHITECTURES="amd64"' \
+            'LB_DISTRIBUTION="jammy"' \
+            'LB_ARCHIVE_AREAS="main restricted universe multiverse"' \
+            'LB_BOOTAPPEND_LIVE="boot=live quiet splash nomodeset video=1024x768"' \
+            'LB_PACKAGE_LISTS="horizon"' \
+            'LB_APT_INDICES="false"' \
+            'LB_APT_RECOMMENDS="false"' \
+            > config/binary
 
-          lb config \
-            --distribution jammy \
-            --architectures amd64 \
-            --bootloader grub \
-            --syslinux-themes none \
-            --archive-areas "main restricted universe multiverse" \
-            --bootappend-live "boot=live quiet splash nomodeset"
+          echo "✅ config/binary created"
 
       - name: 🧪 Configure package lists
         run: |
-          # 确保使用我们的包列表
-          echo 'LB_PACKAGE_LISTS="horizon"' >> config/binary
+          # 确保包列表目录存在
+          mkdir -p config/package-lists
 
           # 创建二进制包列表
           echo "live-boot" > config/package-lists/horizon.list.binary
 
-          # 检查并移除任何包含 "auto" 的包列表
+          # 检查并修复任何包含 "auto" 的包列表
           echo "=== Checking for 'auto' in package lists ==="
           find config/package-lists/ -type f -name "*.list.*" 2>/dev/null | while read file; do
             if grep -q "^auto$" "$file" || grep -q "^auto " "$file"; then
@@ -63,20 +68,49 @@ jobs:
             fi
           done
 
-          # 创建空包列表以覆盖默认设置
-          echo "# Empty package list" > config/package-lists/empty.list.chroot
+          # 创建空包列表以覆盖任何默认设置
+          echo "# Empty package list to prevent auto package installation" > config/package-lists/empty.list.chroot
           echo "# Empty binary package list" > config/package-lists/empty.list.binary
+
+          # 更新配置以使用我们的包列表
           echo 'LB_PACKAGE_LISTS="horizon empty"' >> config/binary
+
+      - name: 🧪 Verify config before build
+        run: |
+          echo "=== Verifying configuration ==="
+          echo "config/binary content:"
+          cat config/binary
+          echo ""
+          echo "Package lists:"
+          ls -la config/package-lists/
+          echo ""
+          echo "Checking for 'auto' in package lists:"
+          grep -r "auto" config/package-lists/ || echo "No 'auto' found"
+          echo ""
+          echo "Checking for auto-generated package lists:"
+          find config/package-lists/ -name "*auto*" -type f 2>/dev/null || echo "No auto-generated lists found"
+          echo ""
+          echo "All package list contents:"
+          find config/package-lists/ -type f -name "*.list.*" -exec sh -c 'echo "=== {} ==="; cat {}' \; 2>/dev/null || true
 
       - name: 🏗 Build ISO
         run: |
           echo "🚀 Starting build..."
-          echo "=== Final package lists ==="
-          find config/package-lists/ -type f -name "*.list.*" -exec sh -c 'echo "{}:"; cat {}; echo' \; 2>/dev/null || true
+          echo "=== Final check before build ==="
+          echo "Checking for config/auto directory..."
+          if [ -d "config/auto" ]; then
+            echo "config/auto directory exists. Contents:"
+            find config/auto -type f 2>/dev/null || echo "No files in config/auto"
+            echo "Checking for 'auto' references in config/auto..."
+            find config/auto -type f -exec grep -l "auto" {} \; 2>/dev/null || echo "No 'auto' references in config/auto"
+          else
+            echo "config/auto directory does not exist"
+          fi
           echo ""
-          echo "=== Final config/binary ==="
-          cat config/binary
+          echo "Removing any auto-generated package lists..."
+          rm -f config/package-lists/*.list.chroot_auto config/package-lists/*.list.binary_auto 2>/dev/null || true
           echo ""
+          echo "=== Starting lb build ==="
           time sudo lb build
 
       - name: 📤 Upload ISO
