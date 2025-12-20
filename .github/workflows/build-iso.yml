@@ -26,7 +26,7 @@ jobs:
           sudo mv /tmp/sources.list /etc/apt/sources.list
 
           sudo apt update
-          sudo apt install -y live-build xorriso
+          sudo apt install -y live-build xorriso syslinux-utils
           lb --version
 
       - name: 🔍 Verify lb command exists
