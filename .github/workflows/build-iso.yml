@@ -47,14 +47,15 @@ jobs:
           lb config \
             --distribution noble \
             --architectures amd64 \
-            --bootloader grub-pc \
+            --bootloader grub \
             --archive-areas "main restricted universe multiverse" \
             --bootappend-live "boot=live quiet splash nomodeset" \
             --mirror-bootstrap "https://archive.ubuntu.com/ubuntu/" \
             --mirror-chroot "https://archive.ubuntu.com/ubuntu/" \
             --mirror-chroot-security "https://security.ubuntu.com/ubuntu/" \
             --security false \
-            --binary-images iso-hybrid
+            --binary-images iso-hybrid \
+            --grub-splash none
 
       - name: 🧪 Configure package lists
         run: |
@@ -103,10 +104,15 @@ jobs:
           echo 'LB_APT_RECOMMENDS="false"' >> config/binary
           echo 'LB_APT_OPTIONS="--allow-unauthenticated"' >> config/binary
           # 指定 GRUB 包，避免使用 grub-legacy
-          echo 'LB_GRUB_PACKAGES="grub-pc"' >> config/binary
+          echo 'LB_GRUB_PACKAGES="grub-pc grub-common grub2-common grub-efi-amd64 grub-efi-amd64-signed"' >> config/binary
           echo 'LB_GRUB="grub-pc"' >> config/binary
           echo 'LB_GRUB_INSTALL="grub-install"' >> config/binary
           echo 'LB_GRUB_MKCONFIG="grub-mkconfig"' >> config/binary
+          # 明确禁用 grub-legacy
+          echo 'LB_GRUB_LEGACY="false"' >> config/binary
+          # 启用 UEFI 支持
+          echo 'LB_EFI="true"' >> config/binary
+          echo 'LB_EFI_BOOTLOADER="grub-efi-amd64"' >> config/binary
           # 启用 ISO hybrid 功能用于 USB 启动
           echo 'LB_ISO_HYBRID="true"' >> config/binary
           echo 'LB_BINARY_IMAGES="iso-hybrid"' >> config/binary
@@ -116,6 +122,8 @@ jobs:
           # 配置引导参数 - 使用 GRUB 作为主要引导加载器
           echo 'LB_BOOTLOADER="grub"' >> config/binary
           echo 'LB_SYSLINUX="false"' >> config/binary
+          # 确保使用正确的 GRUB 版本
+          echo 'LB_GRUB_VERSION="2"' >> config/binary
 
       - name: 🧪 Verify config before build
         run: |
@@ -139,13 +147,18 @@ jobs:
           # 检查引导配置
           echo "Checking boot configuration..."
           ls -la config/boot* 2>/dev/null || echo "No boot config files found"
+          # 创建必要的引导配置目录
+          mkdir -p config/includes.binary/isolinux
+          echo ""
+          echo "=== Final GRUB configuration check ==="
+          grep -i grub config/binary || echo "No GRUB config found"
           echo ""
           set -x
           time sudo lb build 2>&1 | tee build.log
           set +x
           echo ""
           echo "=== Build log summary ==="
-          tail -100 build.log | grep -E "(Error|error|FAIL|fail|auto|Release|boot|isohybrid)" || echo "No significant errors found"
+          tail -100 build.log | grep -E "(Error|error|FAIL|fail|auto|Release|boot|isohybrid|grub)" || echo "No significant errors found"
           echo ""
           echo "=== Checking ISO file ==="
           ls -lh *.iso 2>/dev/null || echo "No ISO files found"
