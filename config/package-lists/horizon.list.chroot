@@ -45,11 +45,7 @@ libxrender1
 libxtst6
 libssl3t64
 grub-pc
-grub-efi-amd64
 grub-common
 grub2-common
-grub-efi-amd64-signed
-shim-signed
-efibootmgr
 syslinux-utils
 mtools
