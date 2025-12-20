@@ -97,26 +97,23 @@ jobs:
           echo "Removing any auto-generated package lists..."
           rm -f config/package-lists/*.list.chroot_auto config/package-lists/*.list.binary_auto 2>/dev/null || true
           echo ""
-          echo "=== Creating auto package list with dummy package ==="
-          # 创建一个包含虚拟包的 auto 包列表
-          echo "# Dummy auto package" > config/package-lists/auto.list.chroot
-          echo "dummy-auto" >> config/package-lists/auto.list.chroot
-          echo "# Dummy auto binary package" > config/package-lists/auto.list.binary
+          echo "=== Creating auto package list ==="
+          # 创建一个名为 auto 的包列表
+          echo "# Auto package" > config/package-lists/auto.list.chroot
+          echo "auto" >> config/package-lists/auto.list.chroot
+          echo "# Auto binary package" > config/package-lists/auto.list.binary
           echo 'LB_PACKAGE_LISTS="horizon empty auto"' >> config/binary
           echo ""
-          echo "=== Creating dummy-auto package ==="
-          mkdir -p dummy-auto/DEBIAN
-          cat > dummy-auto/DEBIAN/control << 'EOF'
-Package: dummy-auto
-Version: 1.0-1
-Architecture: all
-Maintainer: Horizon TC <horizon@example.com>
-Description: Dummy package to satisfy auto dependency
- This is a dummy package to satisfy live-build's requirement for an 'auto' package.
-Depends: dash
-EOF
-          dpkg-deb --build dummy-auto
-          mv dummy-auto.deb config/packages.chroot/
+          echo "=== Creating auto package ==="
+          mkdir -p auto-pkg/DEBIAN
+          echo "Package: auto" > auto-pkg/DEBIAN/control
+          echo "Version: 1.0-1" >> auto-pkg/DEBIAN/control
+          echo "Architecture: all" >> auto-pkg/DEBIAN/control
+          echo "Maintainer: Horizon TC <horizon@example.com>" >> auto-pkg/DEBIAN/control
+          echo "Description: Dummy auto package for live-build" >> auto-pkg/DEBIAN/control
+          echo " This is a dummy package to satisfy live-build's requirement." >> auto-pkg/DEBIAN/control
+          dpkg-deb --build auto-pkg
+          mv auto-pkg.deb config/packages.chroot/
           echo ""
           echo "=== Starting lb build ==="
           time sudo lb build
