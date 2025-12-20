@@ -6,7 +6,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: 📥 Checkout code (with LFS)
         uses: actions/checkout@v4
@@ -15,18 +15,13 @@ jobs:
 
       - name: 🛠 Install live-build and fix apt sources
         run: |
-          # 完全修复 apt 源配置
-          echo "=== Completely fixing apt sources ==="
-          # 备份原始 sources.list
-          sudo cp /etc/apt/sources.list /etc/apt/sources.list.backup
-          # 创建正确的 sources.list
-          echo "deb https://archive.ubuntu.com/ubuntu jammy main restricted universe multiverse" > /tmp/sources.list
-          echo "deb https://archive.ubuntu.com/ubuntu jammy-updates main restricted universe multiverse" >> /tmp/sources.list
-          echo "deb https://security.ubuntu.com/ubuntu jammy-security main restricted universe multiverse" >> /tmp/sources.list
-          sudo mv /tmp/sources.list /etc/apt/sources.list
-
+          # 安装必要的构建工具
+          echo "=== Installing build tools ==="
           sudo apt update
-          sudo apt install -y live-build xorriso syslinux-utils
+          sudo apt install -y live-build xorriso syslinux-utils mtools
+          # 验证 isohybrid 命令是否存在
+          which isohybrid || echo "Checking for isohybrid..."
+          find /usr -name "isohybrid" -type f 2>/dev/null | head -5 || echo "Will install syslinux-utils in chroot"
           lb --version
 
       - name: 🔍 Verify lb command exists
@@ -48,9 +43,9 @@ jobs:
           # 清理现有配置
           rm -rf config/auto config/package-lists/*.list.binary config/package-lists/*.list.chroot_auto 2>/dev/null || true
 
-          # 使用最小配置，指定正确的镜像
+          # 使用 Ubuntu 24.04 (noble) 配置
           lb config \
-            --distribution jammy \
+            --distribution noble \
             --architectures amd64 \
             --bootloader grub-pc \
             --archive-areas "main restricted universe multiverse" \
@@ -79,7 +74,10 @@ jobs:
             echo "grub-pc" >> config/package-lists/horizon.list.chroot
             echo "grub-common" >> config/package-lists/horizon.list.chroot
             echo "grub2-common" >> config/package-lists/horizon.list.chroot
-            echo "Added GRUB packages to horizon.list.chroot"
+            # 添加 syslinux-utils 用于 isohybrid
+            echo "syslinux-utils" >> config/package-lists/horizon.list.chroot
+            echo "mtools" >> config/package-lists/horizon.list.chroot
+            echo "Added GRUB and USB boot packages to horizon.list.chroot"
           else
             echo "WARNING: horizon.list.chroot not found"
           fi
@@ -87,10 +85,10 @@ jobs:
           # 修复 chroot 内的 apt 源配置
           echo "=== Fixing apt sources in chroot ==="
           mkdir -p config/archives
-          # 创建正确的 sources.list 文件
-          echo "deb https://archive.ubuntu.com/ubuntu jammy main restricted universe multiverse" > config/archives/ubuntu.list.chroot
-          echo "deb https://archive.ubuntu.com/ubuntu jammy-updates main restricted universe multiverse" >> config/archives/ubuntu.list.chroot
-          echo "deb https://security.ubuntu.com/ubuntu jammy-security main restricted universe multiverse" >> config/archives/ubuntu.list.chroot
+          # 创建正确的 sources.list 文件 (Ubuntu 24.04 noble)
+          echo "deb https://archive.ubuntu.com/ubuntu noble main restricted universe multiverse" > config/archives/ubuntu.list.chroot
+          echo "deb https://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse" >> config/archives/ubuntu.list.chroot
+          echo "deb https://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse" >> config/archives/ubuntu.list.chroot
           # 确保 live-build 使用我们的源文件
           echo 'LB_APT_SOURCE_ARCHIVES="ubuntu"' >> config/binary
           # 禁用 security 仓库的自动检测
@@ -108,6 +106,8 @@ jobs:
           echo 'LB_GRUB="grub-pc"' >> config/binary
           echo 'LB_GRUB_INSTALL="grub-install"' >> config/binary
           echo 'LB_GRUB_MKCONFIG="grub-mkconfig"' >> config/binary
+          # 启用 ISO hybrid 功能用于 USB 启动
+          echo 'LB_ISO_HYBRID="true"' >> config/binary
 
       - name: 🧪 Verify config before build
         run: |

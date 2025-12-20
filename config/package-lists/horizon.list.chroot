@@ -43,4 +43,9 @@ libxi6
 libxrandr2
 libxrender1
 libxtst6
-libssl3
+libssl3t64
+grub-pc
+grub-common
+grub2-common
+syslinux-utils
+mtools
