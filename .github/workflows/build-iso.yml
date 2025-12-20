@@ -32,23 +32,18 @@ jobs:
             exit 1
           fi
 
-      - name: ⚙️ Manual config (safe for GitHub Actions)
+      - name: ⚙️ Configure live-build
         run: |
-          mkdir -p config
-          # Create binary config
-          printf '%s\n' \
-            'LB_BOOTLOADER="grub"' \
-            'LB_SYSLINUX="false"' \
-            'LB_ARCHITECTURES="amd64"' \
-            'LB_DISTRIBUTION="jammy"' \
-            'LB_ARCHIVE_AREAS="main restricted universe multiverse"' \
-            'LB_BOOTAPPEND_LIVE="boot=live quiet splash nomodeset video=1024x768"' \
-            'LB_PACKAGE_LISTS="horizon"' \
-            'LB_APT_INDICES="false"' \
-            'LB_APT_RECOMMENDS="false"' \
-            > config/binary
+          # Clean up any existing config
+          rm -rf config/auto config/package-lists/*.list.binary config/package-lists/*.list.chroot_auto 2>/dev/null || true
 
-          echo "✅ config/binary created"
+          # Use minimal lb config
+          lb config \
+            --distribution jammy \
+            --architectures amd64 \
+            --bootloader grub \
+            --archive-areas "main restricted universe multiverse" \
+            --bootappend-live "boot=live quiet splash nomodeset"
 
       - name: 🧪 Configure package lists
         run: |
@@ -69,11 +64,13 @@ jobs:
           done
 
           # 创建空包列表以覆盖任何默认设置
-          echo "# Empty package list to prevent auto package installation" > config/package-lists/empty.list.chroot
+          echo "# Empty package list" > config/package-lists/empty.list.chroot
           echo "# Empty binary package list" > config/package-lists/empty.list.binary
 
-          # 更新配置以使用我们的包列表
+          # 设置包列表配置
           echo 'LB_PACKAGE_LISTS="horizon empty"' >> config/binary
+          echo 'LB_APT_INDICES="false"' >> config/binary
+          echo 'LB_APT_RECOMMENDS="false"' >> config/binary
 
       - name: 🧪 Verify config before build
         run: |
@@ -97,18 +94,29 @@ jobs:
         run: |
           echo "🚀 Starting build..."
           echo "=== Final check before build ==="
-          echo "Checking for config/auto directory..."
-          if [ -d "config/auto" ]; then
-            echo "config/auto directory exists. Contents:"
-            find config/auto -type f 2>/dev/null || echo "No files in config/auto"
-            echo "Checking for 'auto' references in config/auto..."
-            find config/auto -type f -exec grep -l "auto" {} \; 2>/dev/null || echo "No 'auto' references in config/auto"
-          else
-            echo "config/auto directory does not exist"
-          fi
-          echo ""
           echo "Removing any auto-generated package lists..."
           rm -f config/package-lists/*.list.chroot_auto config/package-lists/*.list.binary_auto 2>/dev/null || true
+          echo ""
+          echo "=== Creating auto package list with dummy package ==="
+          # 创建一个包含虚拟包的 auto 包列表
+          echo "# Dummy auto package" > config/package-lists/auto.list.chroot
+          echo "dummy-auto" >> config/package-lists/auto.list.chroot
+          echo "# Dummy auto binary package" > config/package-lists/auto.list.binary
+          echo 'LB_PACKAGE_LISTS="horizon empty auto"' >> config/binary
+          echo ""
+          echo "=== Creating dummy-auto package ==="
+          mkdir -p dummy-auto/DEBIAN
+          cat > dummy-auto/DEBIAN/control << 'EOF'
+Package: dummy-auto
+Version: 1.0-1
+Architecture: all
+Maintainer: Horizon TC <horizon@example.com>
+Description: Dummy package to satisfy auto dependency
+ This is a dummy package to satisfy live-build's requirement for an 'auto' package.
+Depends: dash
+EOF
+          dpkg-deb --build dummy-auto
+          mv dummy-auto.deb config/packages.chroot/
           echo ""
           echo "=== Starting lb build ==="
           time sudo lb build
